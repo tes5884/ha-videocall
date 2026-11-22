@@ -23,7 +23,6 @@ from .const import (
     BUS_EVT_ANSWERED,
     BUS_EVT_ENDED,
     BUS_EVT_INCOMING,
-    DOORBELL_KIND,
     DOMAIN,
     EVT_ACCEPTED,
     EVT_ANSWER,
@@ -338,109 +337,6 @@ def async_decline_phone(hass: HomeAssistant, call: Call, service: str) -> None:
         async_end_call(hass, call, EndReason.DECLINED)
         return
     _async_refresh(hass, call)
-
-
-# --------------------------------------------------------------------------
-# doorbell ring (SPEC §14) — synthetic caller, go2rtc media peer
-# --------------------------------------------------------------------------
-
-def _doorbell_caller_info(doorbell: dict) -> dict:
-    """EndpointInfo-shaped identity for a doorbell (no registered endpoint).
-    `kind: doorbell` tells the client to connect its media to go2rtc instead
-    of awaiting a peer offer."""
-    return {
-        "endpoint_id": f"doorbell:{doorbell['id']}",
-        "client_id": f"doorbell:{doorbell['id']}",
-        "name": doorbell.get("name") or "Doorbell",
-        "area_id": doorbell.get("area_id"),
-        "area_name": doorbell.get("area_name"),
-        "ua_kind": DOORBELL_KIND,
-        "user_id": None,
-        "user_name": None,
-        "kind": DOORBELL_KIND,
-        "online": True,
-        "in_call": False,
-    }
-
-
-async def async_ring_doorbell(
-    hass: HomeAssistant, doorbell: dict, target: dict, media: str = "video",
-) -> dict:
-    """Ring a doorbell to a target (person/area/mobile/all). Reuses the whole
-    ring fan-out (in-app ring + mobile push + timeout); the accepting client
-    then connects its media directly to go2rtc using `doorbell`. Raises
-    ValueError('no_targets') when nothing is reachable."""
-    data = _data(hass)
-    target_type = target["type"]
-    target_id = target.get("id")
-    targets, phones, _ = _resolve_ring(hass, target_type, target_id)
-    if not targets and not phones:
-        raise ValueError("no_targets")
-
-    caller_info = _doorbell_caller_info(doorbell)
-    call = data.calls.create(
-        Call(
-            call_id=uuid.uuid4().hex,
-            caller_id=caller_info["client_id"],  # synthetic; not in the registry
-            media=media,
-            target_type=target_type,
-            target_id=target_id,
-            ringing={t.client_id for t in targets},
-            phones={p.notify_service: p for p in phones},
-            ringing_phones={p.notify_service for p in phones},
-            caller_info=caller_info,
-            doorbell=doorbell,
-        )
-    )
-    notify_services = list(call.phones)
-
-    for t in targets:
-        t.call_id = call.call_id  # busy-guarded while ringing
-        _push(t, EVT_RING, {
-            "call_id": call.call_id,
-            "media": call.media,
-            "caller": caller_info,
-            "target_type": target_type,
-            "drop_in": False,
-            "doorbell": doorbell,
-        })
-
-    if call.phones:
-        await _async_push_ring(hass, call, caller_info)
-    _async_refresh(hass, call)
-
-    _LOGGER.info(
-        "doorbell ring %s (%s): %d in-app, %d phone(s)",
-        call.call_id[:8], doorbell.get("name"), len(targets), len(notify_services),
-    )
-
-    @callback
-    def _timeout(_now) -> None:
-        data.ring_timeouts.pop(call.call_id, None)
-        if call.state is CallState.RINGING:
-            async_end_call(hass, call, EndReason.TIMEOUT)
-
-    data.ring_timeouts[call.call_id] = async_call_later(hass, data.ring_timeout, _timeout)
-
-    hass.bus.async_fire(
-        BUS_EVT_INCOMING,
-        {
-            "call_id": call.call_id,
-            "media": call.media,
-            "drop_in": False,
-            "caller": caller_info,
-            "doorbell": doorbell,
-            "target_type": target_type,
-            "target_id": target_id,
-            "ringing": sorted(call.ringing),
-            "mobile_notified": notify_services,
-        },
-    )
-    return {
-        "call_id": call.call_id,
-        "ringing": sorted(call.ringing),
-        "mobile_notified": notify_services,
-    }
 
 
 # --------------------------------------------------------------------------
