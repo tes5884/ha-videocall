@@ -173,7 +173,7 @@ class VideocallOptionsFlow(config_entries.OptionsFlow):
         multiline = TextSelector(TextSelectorConfig(multiline=True))
         schema = vol.Schema(
             {
-                # raw RTCIceServer[] override. Blank → default STUN (or the
+                # raw RTCIceServer[] override. Blank → no ICE servers, LAN-only (or the
                 # "Use TURN for STUN" checkbox) + your TURN; [] → no defaults.
                 _prefill(OPT_ICE_SERVERS, src): multiline,
                 _prefill(OPT_PERSON_NOTIFY_MAP, src, "{}"): multiline,

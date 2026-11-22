@@ -27,7 +27,9 @@ OPT_DROP_IN_ALLOWLIST = "drop_in_allowlist"
 OPT_ANSWER_DASHBOARD = "answer_dashboard"  # deep-link base path for mobile answer
 OPT_PERSON_NOTIFY_MAP = "person_notify_map"  # JSON: {"person.x": ["notify.mobile_app_y"]}
 
-DEFAULT_ICE_SERVERS = '[{"urls":"stun:stun.l.google.com:19302"}]'
+# Home-hardened: LAN-only by default. No public STUN (upstream defaulted to
+# stun.l.google.com, leaking public IP + call timing to Google).
+DEFAULT_ICE_SERVERS = '[]'
 DEFAULT_TURN_STUN = False
 DEFAULT_TURN_TLS = False
 DEFAULT_RING_TIMEOUT = 30

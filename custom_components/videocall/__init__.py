@@ -83,7 +83,7 @@ class VideocallData:
         #      coturn for STUN, no public dependency, no JSON to hand-write.
         #   2) advanced ice_servers JSON override: blank → skip to (3);
         #      [] / null → NO default servers; a valid RTCIceServer[] → used as-is.
-        #   3) the public default STUN.
+        #   3) the default list (home-hardened: [] = LAN-only, no public STUN).
         # Malformed advanced JSON falls back to the default (with a warning).
         # (a TLS-only public port can't answer STUN — browsers have no stuns: —
         # so with TLS on only the LAN host qualifies)

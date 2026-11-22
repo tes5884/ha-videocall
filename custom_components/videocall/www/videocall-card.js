@@ -953,7 +953,10 @@
       this.conn = null;
       this.registered = false;
       this.options = {};
-      this.iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+      // Home-hardened: start with NO ICE servers (LAN host candidates only).
+      // The configured list arrives with the roster; never fall back to a
+      // public STUN server.
+      this.iceServers = [];
       this.ringTimeout = 30;
       this.rosterCache = { endpoints: [], areas: [], persons: [] };
       this.session = null;             // the single CallSession (or null)
@@ -1099,7 +1102,8 @@
       // configured TURN server actually reaches clients
       const cfg = r?.config;
       if (cfg) {
-        if (Array.isArray(cfg.ice_servers) && cfg.ice_servers.length) this.iceServers = cfg.ice_servers;
+        // an empty configured list is meaningful (LAN-only) — honour it
+        if (Array.isArray(cfg.ice_servers)) this.iceServers = cfg.ice_servers;
         if (cfg.ring_timeout) this.ringTimeout = cfg.ring_timeout;
         this.options = { ...this.options, allow_drop_in: cfg.allow_drop_in === true };
       }
