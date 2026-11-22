@@ -34,4 +34,11 @@ async def setup_videocall(hass, videocall_options):
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    return entry
+    yield entry
+    # cancel the roster debounce + ring timeouts so no timer outlives the test
+    data = hass.data.get("videocall")
+    if data is not None and data.roster_unsub is not None:
+        data.roster_unsub()
+        data.roster_unsub = None
+    await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()

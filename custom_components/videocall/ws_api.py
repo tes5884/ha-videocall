@@ -48,6 +48,7 @@ from .const import (
     WS_REGISTER,
     WS_ROSTER,
 )
+from .gate import melacha_clear
 from .models import Call, CallState, EndReason, Endpoint, InvalidTransition, Phone
 
 _LOGGER = logging.getLogger(__name__)
@@ -450,7 +451,7 @@ async def ws_register(hass: HomeAssistant, connection, msg: dict) -> None:
     # full-screen ring appears no matter how the app was opened, and the
     # Answer tap supplies the user gesture iOS requires for getUserMedia. A
     # phone that declined stays declined.
-    if not endpoint.in_call:
+    if not endpoint.in_call and melacha_clear(hass):
         for ringing_call in data.calls.active():
             if not ringing_call.invites(endpoint):
                 continue
@@ -501,6 +502,14 @@ async def ws_invite(hass: HomeAssistant, connection, msg: dict) -> None:
         return
     if caller.in_call:
         connection.send_error(msg["id"], "caller_busy", "Caller already in a call")
+        return
+    # home-hardened Shabbos/Yom Tov gate: no call starts (no in-app ring, no
+    # phone push) unless issur melacha is definitely not in effect.
+    if not melacha_clear(hass):
+        _LOGGER.info("invite refused: issur melacha gate closed")
+        connection.send_error(
+            msg["id"], "issur_melacha", "Calls are off on Shabbos and Yom Tov"
+        )
         return
 
     # drop-in consent is per-TARGET (SPEC §5.4a): blocked targets ring

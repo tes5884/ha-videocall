@@ -66,6 +66,11 @@ EVT_ROSTER = "roster"
 # (home-hardened: the videocall.ring service is removed; see __init__.py)
 DOORBELL_KIND = "doorbell"           # caller_info["kind"] marker for clients
 
+# --- Shabbos / Yom Tov gate (home-hardened) ------------------------------------
+# No call may start, and no ring / missed-call phone push may go out, unless
+# this sensor is exactly "off". Missing / unknown / unavailable = blocked.
+MELACHA_GATE_ENTITY = "binary_sensor.jewish_calendar_issur_melacha_in_effect"
+
 # --- HA bus events (automation surface) --------------------------------------
 BUS_EVT_INCOMING = "videocall_incoming"
 BUS_EVT_ANSWERED = "videocall_answered"

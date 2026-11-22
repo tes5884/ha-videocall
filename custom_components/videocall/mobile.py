@@ -25,6 +25,7 @@ from .const import (
     NOTIF_CHANNEL,
     NOTIF_TAG_PREFIX,
 )
+from .gate import melacha_clear
 from .models import Call
 
 _LOGGER = logging.getLogger(__name__)
@@ -219,7 +220,14 @@ class MobileRinger:
     ) -> set[str]:
         """Push the ring to each phone; returns the services it couldn't reach.
         Each phone's Decline action names that phone (SPEC §7.3). Apple
-        devices get no Answer action (SPEC §7.1)."""
+        devices get no Answer action (SPEC §7.1).
+
+        Home-hardened: during issur melacha (or when that can't be confirmed)
+        nothing is sent and every phone counts as unreached, so it is never
+        treated as ringing and never gets a missed-call note either."""
+        if not melacha_clear(self.hass):
+            _LOGGER.info("ring push suppressed: issur melacha gate closed")
+            return set(services)
         options = self._get_options()
         dashboard = options.get("answer_dashboard") or "/lovelace"
         ring_timeout = int(options.get("ring_timeout") or 30)
@@ -285,7 +293,11 @@ class MobileRinger:
         self, call: Call, caller_info: dict, services: list[str]
     ) -> None:
         """Replace an unanswered ring with a quiet missed-call note (same tag):
-        no sound, no wake, no watch buzz, no actions (SPEC §7.4)."""
+        no sound, no wake, no watch buzz, no actions (SPEC §7.4).
+        Home-hardened: suppressed entirely while the melacha gate is closed."""
+        if not melacha_clear(self.hass):
+            _LOGGER.info("missed-call push suppressed: issur melacha gate closed")
+            return
         dashboard = self._get_options().get("answer_dashboard") or "/lovelace"
         payload = {
             "title": f"Missed {call.media} call",
