@@ -12,6 +12,7 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.service import async_register_admin_service
 import voluptuous as vol
 
 from . import ws_api
@@ -388,12 +389,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def svc_prune(call: ServiceCall) -> None:
         async_prune_offline_endpoints(hass)
 
-    hass.services.async_register(
-        DOMAIN, "hangup", svc_hangup,
+    # Home-hardened: admin-only (non-admin users such as the kitchen tablet
+    # login get Unauthorized); automations and scripts run unrestricted.
+    async_register_admin_service(
+        hass, DOMAIN, "hangup", svc_hangup,
         vol.Schema({vol.Optional("call_id"): str}),
     )
-    hass.services.async_register(
-        DOMAIN, "prune_endpoints", svc_prune,
+    async_register_admin_service(
+        hass, DOMAIN, "prune_endpoints", svc_prune,
         vol.Schema({vol.Optional("days", default=30): int}),
     )
     # Home-hardened: the upstream videocall.ring (go2rtc doorbell) service is
