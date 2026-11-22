@@ -1101,7 +1101,7 @@
       if (cfg) {
         if (Array.isArray(cfg.ice_servers) && cfg.ice_servers.length) this.iceServers = cfg.ice_servers;
         if (cfg.ring_timeout) this.ringTimeout = cfg.ring_timeout;
-        this.options = { ...this.options, allow_drop_in: cfg.allow_drop_in !== false };
+        this.options = { ...this.options, allow_drop_in: cfg.allow_drop_in === true };
       }
       this._emit("roster", r);
     }
@@ -1124,7 +1124,11 @@
             doorbell: evt.doorbell,   // set → answering connects to go2rtc (§14)
           });
           this._emit("session", this.session);
-          if (evt.drop_in && uaKind() !== "companion-ios") {
+          // home-hardened: auto-answer only when the server flagged this ring
+          // as an allowed drop-in (server-side allowlist) AND the master
+          // switch is explicitly on in the config we received.
+          if (evt.drop_in === true && this.options.allow_drop_in === true
+              && uaKind() !== "companion-ios") {
             // drop-in: skip ring UI, auto-answer (SPEC §5.4a). Server enforces
             // consent; kiosks/Android tablets have persistent gUM permission
             // so accept() proceeds without a gesture. iOS companions fall

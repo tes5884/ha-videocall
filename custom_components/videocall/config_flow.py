@@ -29,6 +29,7 @@ from .const import (
     DOMAIN,
     OPT_ALLOW_DROP_IN,
     OPT_ANSWER_DASHBOARD,
+    OPT_DROP_IN_ALLOWLIST,
     OPT_ICE_SERVERS,
     OPT_PERSON_NOTIFY_MAP,
     OPT_RING_TIMEOUT,
@@ -150,6 +151,19 @@ class VideocallOptionsFlow(config_entries.OptionsFlow):
                         isinstance(s, dict) and "credential" in s for s in parsed
                     ):
                         errors[key] = "credential_in_json"
+            # drop-in allowlist: {target: [caller, ...]} with string members only
+            try:
+                acl = json.loads(user_input.get(OPT_DROP_IN_ALLOWLIST) or "{}")
+            except ValueError:
+                acl = None
+            if not (
+                isinstance(acl, dict)
+                and all(
+                    isinstance(v, list) and all(isinstance(c, str) for c in v)
+                    for v in acl.values()
+                )
+            ):
+                errors[OPT_DROP_IN_ALLOWLIST] = "invalid_json"
             if not errors:
                 return self._save(user_input)
 
@@ -163,6 +177,8 @@ class VideocallOptionsFlow(config_entries.OptionsFlow):
                 # "Use TURN for STUN" checkbox) + your TURN; [] → no defaults.
                 _prefill(OPT_ICE_SERVERS, src): multiline,
                 _prefill(OPT_PERSON_NOTIFY_MAP, src, "{}"): multiline,
+                # server-side drop-in allowlist; {} (default) = nobody may drop in
+                _prefill(OPT_DROP_IN_ALLOWLIST, src, "{}"): multiline,
             }
         )
         return self.async_show_form(

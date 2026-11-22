@@ -30,7 +30,7 @@
           "turn_tls": "TURN over TLS (turns:)",
           "turn_stun": "Use my TURN server for STUN too",
           "ring_timeout": "Ring timeout (seconds)",
-          "allow_drop_in": "Allow drop-in by default (per-device consent is set on each device's card)",
+          "allow_drop_in": "Allow drop-in (master switch; also needs the Advanced drop-in allowlist)",
           "answer_dashboard": "Dashboard path for mobile Answer deep link"
         },
         "data_description": {
@@ -43,9 +43,11 @@
         "title": "Advanced overrides",
         "data": {
           "ice_servers": "Extra ICE servers (JSON array of RTCIceServer)",
-          "person_notify_map": "Manual person → notify services map (JSON)"
+          "person_notify_map": "Manual person → notify services map (JSON)",
+          "drop_in_allowlist": "Drop-in allowlist (JSON: {\"<target client_id or device_id>\": [\"<caller user_id or user name>\"]})"
         },
         "data_description": {
+          "drop_in_allowlist": "Server-side: a caller may drop in (auto-answer) on a device only if the master switch is on AND this map lists that caller for that device. A device not listed, or listed with [], accepts no drop-in. A device's own card setting can only narrow this.",
           "ice_servers": "Override the ICE server list. Blank = default STUN (or your \"Use my TURN server for STUN\" setting) plus your TURN. Enter [] for no default ICE servers. Always merged with your TURN settings. Credentials are not allowed here; use the TURN credential field in Settings."
         }
       }

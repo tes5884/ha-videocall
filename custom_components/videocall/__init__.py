@@ -28,6 +28,7 @@ from .const import (
     ENDED_CALL_LOG_SIZE,
     OPT_ALLOW_DROP_IN,
     OPT_ANSWER_DASHBOARD,
+    OPT_DROP_IN_ALLOWLIST,
     OPT_ICE_SERVERS,
     OPT_RING_TIMEOUT,
     OPT_TURN_CREDENTIAL,
@@ -146,25 +147,52 @@ class VideocallData:
     def allow_drop_in(self) -> bool:
         return bool(self.entry.options.get(OPT_ALLOW_DROP_IN, DEFAULT_ALLOW_DROP_IN))
 
-    def drop_in_allowed(self, target: Endpoint, caller: Endpoint) -> bool:
-        """Per-endpoint drop-in consent (SPEC §5.4a) — DEVICE-OWNED.
+    @property
+    def drop_in_allowlist(self) -> dict[str, set[str]]:
+        """Server-side drop-in allowlist: {target key: {caller keys}}, lowercased.
 
-        Each endpoint declares its own allowed callers at registration (set
-        via the videocall-card ON that device; household trust model — this
-        is deliberately not central/high-security config). None = follow the
-        global allow_drop_in default; [] = nobody; a non-empty list admits
-        ONLY those users (user_id or user name).
+        Blank, malformed or non-dict JSON is an empty map (deny all)."""
+        raw = self.entry.options.get(OPT_DROP_IN_ALLOWLIST) or ""
+        try:
+            parsed = json.loads(raw) if isinstance(raw, str) and raw.strip() else {}
+        except ValueError:
+            _LOGGER.warning("Invalid drop_in_allowlist JSON; drop-in denied for all")
+            return {}
+        if not isinstance(parsed, dict):
+            return {}
+        out: dict[str, set[str]] = {}
+        for target, callers in parsed.items():
+            if isinstance(callers, list):
+                out[str(target).lower()] = {
+                    c.lower() for c in callers if isinstance(c, str) and c
+                }
+        return out
+
+    def drop_in_allowed(self, target: Endpoint, caller: Endpoint) -> bool:
+        """May `caller` drop in (auto-answer) on `target`? HOME-HARDENED.
+
+        Deny unless ALL of these hold:
+          1. the global allow_drop_in switch is on (default off);
+          2. the SERVER-SIDE drop_in_allowlist names this target (endpoint
+             client_id or HA device_id) and lists this caller (HA user_id or
+             user name); a missing or empty entry denies;
+          3. if the target device declared its own consent list at register,
+             the caller is on that too. Device-owned consent can only narrow
+             the server policy, never widen it ([] = nobody).
         """
-        allow = target.drop_in_allow
-        if allow is None:
-            return self.allow_drop_in
-        if not allow:
+        if not self.allow_drop_in:
             return False
-        ids = {str(a).lower() for a in allow}
-        return bool(
-            (caller.user_id and caller.user_id.lower() in ids)
-            or (caller.user_name and caller.user_name.lower() in ids)
-        )
+        caller_keys = {k.lower() for k in (caller.user_id, caller.user_name) if k}
+        if not caller_keys:
+            return False
+        allowlist = self.drop_in_allowlist
+        target_keys = [k.lower() for k in (target.client_id, target.device_id) if k]
+        if not any(caller_keys & allowlist.get(t, set()) for t in target_keys):
+            return False
+        device = target.drop_in_allow
+        if device is None:
+            return True
+        return bool(caller_keys & {str(a).lower() for a in device})
 
     # --- endpoint device / area resolution (SPEC §4.2) ----------------------
 
